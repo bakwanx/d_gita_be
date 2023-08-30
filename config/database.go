@@ -16,7 +16,7 @@ func InitDB() {
 	if err != nil {
 		panic(err.Error())
 	}
-	// initMigrate()
+	initMigrate()
 }
 
 func initMigrate() {
