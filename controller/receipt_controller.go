@@ -1,87 +1,107 @@
 package controller
 
 import (
-	"d_gita_be/config"
-	"d_gita_be/models"
 	"encoding/json"
-	"io/ioutil"
-	"math/rand"
+	"fmt"
+	"io"
 	"net/http"
-	"strconv"
+	"os"
+	"path/filepath"
 	"time"
 )
+
+const MAX_UPLOAD_SIZE = 1024 * 1024 // 1MB
 
 func CreateReceipt(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 
+	// 32 MB is the default used by FormFile()
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"message": err.Error(),
+			"status":  http.StatusInternalServerError,
+		})
+		return
+	}
+
 	nik := r.FormValue("nik")
-	password := r.FormValue("password")
-	name := r.FormValue("name")
-	jabatan := r.FormValue("jabatan")
-	lokasi := r.FormValue("lokasi")
-	file, handler, err := r.FormFile("profile")
-	// error when retrieving image
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(rw).Encode(map[string]interface{}{
-			"message": "internal server error",
-			"status":  http.StatusInternalServerError,
-		})
-		return
-	}
-	defer file.Close()
+	files := r.MultipartForm.File["images"]
 
-	// Create a temporary file within our public directory that follows
-	// a particular naming pattern
-	randomImageName := strconv.Itoa(int(rand.NewSource(time.Now().UnixMicro()).Int63()))
+	for _, fileHeader := range files {
+		// Open the file
+		file, err := fileHeader.Open()
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-	tempFile, err := ioutil.TempFile("public", "profile-"+randomImageName+handler.Filename+".png")
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(rw).Encode(map[string]interface{}{
-			"message": "internal server error",
-			"status":  http.StatusInternalServerError,
-		})
-		return
-	}
-	defer tempFile.Close()
+		defer file.Close()
 
-	// read all of the contents of our uploaded file into a
-	// byte array
-	fileBytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(rw).Encode(map[string]interface{}{
-			"message": "internal server error",
-			"status":  http.StatusInternalServerError,
-		})
-		return
-	}
-	// write this byte array to our temporary file
-	tempFile.Write(fileBytes)
+		buff := make([]byte, 512)
+		_, err = file.Read(buff)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-	user := models.User{
-		Nik:      nik,
-		Password: password,
-		Name:     name,
-		Jabatan:  jabatan,
-		Lokasi:   lokasi,
-		Profile:  randomImageName,
+		filetype := http.DetectContentType(buff)
+		if filetype != "image/jpeg" && filetype != "image/png" {
+			http.Error(rw, "The provided file format is not allowed. Please upload a JPEG or PNG image", http.StatusBadRequest)
+			return
+		}
+
+		_, err = file.Seek(0, io.SeekStart)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = os.MkdirAll("./public", os.ModePerm)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		f, err := os.Create(fmt.Sprintf("./public/%d%s", time.Now().UnixNano(), filepath.Ext(fileHeader.Filename)))
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		defer f.Close()
+
+		_, err = io.Copy(f, file)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
-	err = config.DB.Save(&user).Error
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(rw).Encode(map[string]interface{}{
-			"message": "internal server error",
-			"status":  http.StatusInternalServerError,
-		})
-		return
-	}
+	// user := models.User{
+	// 	Nik:      nik,
+	// 	Password: password,
+	// 	Name:     name,
+	// 	Jabatan:  jabatan,
+	// 	Lokasi:   lokasi,
+	// 	Profile:  randomImageName,
+	// }
+
+	// err = config.DB.Save(&user).Error
+	// if err != nil {
+	// 	rw.WriteHeader(http.StatusInternalServerError)
+	// 	json.NewEncoder(rw).Encode(map[string]interface{}{
+	// 		"message": "internal server error",
+	// 		"status":  http.StatusInternalServerError,
+	// 	})
+	// 	return
+	// }
 
 	rw.WriteHeader(http.StatusOK)
 	json.NewEncoder(rw).Encode(map[string]interface{}{
 		"message": "success",
-		"data":    user,
+		"data": map[string]interface{}{
+			"nik": nik,
+		},
 	})
 }

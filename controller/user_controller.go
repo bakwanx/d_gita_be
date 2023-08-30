@@ -3,9 +3,14 @@ package controller
 import (
 	"d_gita_be/config"
 	"d_gita_be/models"
+	"d_gita_be/utils"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"time"
 )
 
 func Register(rw http.ResponseWriter, r *http.Request) {
@@ -16,7 +21,7 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	jabatan := r.FormValue("jabatan")
 	lokasi := r.FormValue("lokasi")
-	file, _, err := r.FormFile("profile")
+	file, fileHeader, err := r.FormFile("profile")
 
 	// error when retrieving image
 	if err != nil {
@@ -29,11 +34,9 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Create a temporary file within our public directory that follows
-	// a particular naming pattern
-	// randomImageName := strconv.Itoa(int(rand.NewSource(time.Now().UnixMicro()).Int63()))
-
-	tempFile, err := ioutil.TempFile("public", "*.png")
+	// Create the uploads folder if it doesn't
+	// already exist
+	err = os.MkdirAll("./public", os.ModePerm)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
@@ -42,11 +45,8 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	defer tempFile.Close()
-
-	// read all of the contents of our uploaded file into a
-	// byte array
-	fileBytes, err := ioutil.ReadAll(file)
+	// Create a new file in the uploads directory
+	dst, err := os.Create(fmt.Sprintf("./public/%d%s", time.Now().UnixNano(), filepath.Ext(fileHeader.Filename)))
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
@@ -55,8 +55,16 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// write this byte array to our temporary file
-	tempFile.Write(fileBytes)
+	defer dst.Close()
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"message": err.Error(),
+			"status":  http.StatusInternalServerError,
+		})
+		return
+	}
 
 	user := models.User{
 		Nik:      nik,
@@ -64,7 +72,7 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 		Name:     name,
 		Jabatan:  jabatan,
 		Lokasi:   lokasi,
-		Profile:  tempFile.Name(),
+		Profile:  utils.ImageUrlProvider(dst.Name(), r),
 	}
 
 	err = config.DB.Save(&user).Error
