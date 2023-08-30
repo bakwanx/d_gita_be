@@ -5,10 +5,7 @@ import (
 	"d_gita_be/models"
 	"encoding/json"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
-	"strconv"
-	"time"
 )
 
 func Register(rw http.ResponseWriter, r *http.Request) {
@@ -20,11 +17,12 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 	jabatan := r.FormValue("jabatan")
 	lokasi := r.FormValue("lokasi")
 	file, _, err := r.FormFile("profile")
+
 	// error when retrieving image
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
-			"message": "internal server error",
+			"message": err.Error(),
 			"status":  http.StatusInternalServerError,
 		})
 		return
@@ -33,13 +31,13 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 
 	// Create a temporary file within our public directory that follows
 	// a particular naming pattern
-	randomImageName := strconv.Itoa(int(rand.NewSource(time.Now().UnixMicro()).Int63()))
+	// randomImageName := strconv.Itoa(int(rand.NewSource(time.Now().UnixMicro()).Int63()))
 
-	tempFile, err := ioutil.TempFile("public", "profile-"+randomImageName+".png")
+	tempFile, err := ioutil.TempFile("public", "*.png")
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
-			"message": "internal server error",
+			"message": err.Error(),
 			"status":  http.StatusInternalServerError,
 		})
 		return
@@ -52,7 +50,7 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
-			"message": "internal server error",
+			"message": err.Error(),
 			"status":  http.StatusInternalServerError,
 		})
 		return
@@ -66,14 +64,14 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 		Name:     name,
 		Jabatan:  jabatan,
 		Lokasi:   lokasi,
-		Profile:  "profile-" + randomImageName + ".png",
+		Profile:  tempFile.Name(),
 	}
 
 	err = config.DB.Save(&user).Error
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
-			"message": "internal server error",
+			"message": err.Error(),
 			"status":  http.StatusInternalServerError,
 		})
 		return
