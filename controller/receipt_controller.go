@@ -1,12 +1,15 @@
 package controller
 
 import (
+	"d_gita_be/config"
+	"d_gita_be/models"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -25,7 +28,38 @@ func CreateReceipt(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nik := r.FormValue("nik")
+	documentName := r.FormValue("document_name")
+	documentType := r.FormValue("document_type")
+	documentProperty := r.FormValue("document_property")
+	documentInformation := r.FormValue("document_information")
+	idUserSender, _ := strconv.Atoi(r.FormValue("id_user_sender"))
+	idUserReceiver, _ := strconv.Atoi(r.FormValue("id_user_receiver"))
+	date := r.FormValue("date")
+	// date, _ := time.Parse("2006-01-02", r.FormValue("date"))
+	status := r.FormValue("status")
+
+	receipt := models.Receipt{
+		DocumentName:        documentName,
+		DocumentType:        documentType,
+		DocumentProperty:    documentProperty,
+		DocumentInformation: documentInformation,
+		IdUserSender:        idUserSender,
+		IdUserReceiver:      idUserReceiver,
+		Date:                date,
+		Status:              status,
+	}
+
+	err := config.DB.Save(&receipt).Error
+
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"message": err.Error(),
+			"status":  http.StatusInternalServerError,
+		})
+		return
+	}
+
 	files := r.MultipartForm.File["images"]
 
 	for _, fileHeader := range files {
@@ -76,32 +110,103 @@ func CreateReceipt(rw http.ResponseWriter, r *http.Request) {
 			http.Error(rw, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		imageReceipt := models.ImageReceipt{
+			IdReceipt: receipt.IdReceipt,
+			Image:     f.Name(),
+		}
+
+		err = config.DB.Save(&imageReceipt).Error
+
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(rw).Encode(map[string]interface{}{
+				"message": err.Error(),
+				"status":  http.StatusInternalServerError,
+			})
+			return
+		}
 	}
-
-	// user := models.User{
-	// 	Nik:      nik,
-	// 	Password: password,
-	// 	Name:     name,
-	// 	Jabatan:  jabatan,
-	// 	Lokasi:   lokasi,
-	// 	Profile:  randomImageName,
-	// }
-
-	// err = config.DB.Save(&user).Error
-	// if err != nil {
-	// 	rw.WriteHeader(http.StatusInternalServerError)
-	// 	json.NewEncoder(rw).Encode(map[string]interface{}{
-	// 		"message": "internal server error",
-	// 		"status":  http.StatusInternalServerError,
-	// 	})
-	// 	return
-	// }
 
 	rw.WriteHeader(http.StatusOK)
 	json.NewEncoder(rw).Encode(map[string]interface{}{
 		"message": "success",
-		"data": map[string]interface{}{
-			"nik": nik,
-		},
+		"data":    receipt,
+	})
+}
+
+func UpdateStatusReceipt(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+
+	receiptId := r.URL.Query()["receiptId"]
+
+	receipt := models.Receipt{}
+
+	err := config.DB.Model(&receipt).Where("id_receipt = ?", receiptId).Update("status", "1").Error
+
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"message": err.Error(),
+			"status":  http.StatusInternalServerError,
+		})
+		return
+	}
+	intReceiptId, err := strconv.Atoi(receiptId[0])
+	err = config.DB.Model(models.Receipt{IdReceipt: intReceiptId}).First(&receipt).Error
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"message": err.Error(),
+			"status":  http.StatusInternalServerError,
+		})
+		return
+	}
+	rw.WriteHeader(http.StatusOK)
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"message": "success",
+		"data":    receipt,
+	})
+}
+
+func GetListReceiptMyTask(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+
+	idUser := r.URL.Query()["idUser"]
+
+	// receipts := []map[string]interface{}{}
+
+	receipts := []models.Receipt{}
+
+	config.DB.Model(models.Receipt{}).Where(" id_user_receiver = ?", idUser).Find(&receipts)
+
+	receiptResponse := []models.ReceiptResponse{}
+	for _, v := range receipts {
+		// get user for sender
+		var userSender = models.User{}
+		config.DB.Where("id_user = ?", v.IdUserSender).First(&userSender)
+
+		// get user for receiver
+		var userReceiver = models.User{}
+		config.DB.Where("id_user = ?", v.IdUserReceiver).First(&userReceiver)
+
+		receiptResponse = append(receiptResponse, models.ReceiptResponse{
+			IdReceipt:           v.IdReceipt,
+			DocumentName:        v.DocumentName,
+			DocumentType:        v.DocumentType,
+			DocumentProperty:    v.DocumentProperty,
+			DocumentInformation: v.DocumentInformation,
+			UserSender:          userSender,
+			UserReceiver:        userReceiver,
+			Date:                v.Date,
+			Status:              v.Status,
+		})
+	}
+
+	rw.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"message": "success",
+		"data":    receiptResponse,
 	})
 }

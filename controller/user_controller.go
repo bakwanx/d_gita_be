@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -46,7 +47,7 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a new file in the uploads directory
-	dst, err := os.Create(fmt.Sprintf("./public/%d%s", time.Now().UnixNano(), filepath.Ext(fileHeader.Filename)))
+	f, err := os.Create(fmt.Sprintf("./public/%d%s", time.Now().UnixNano(), filepath.Ext(fileHeader.Filename)))
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
@@ -55,8 +56,8 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	defer dst.Close()
-	_, err = io.Copy(dst, file)
+	defer f.Close()
+	_, err = io.Copy(f, file)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
@@ -72,7 +73,7 @@ func Register(rw http.ResponseWriter, r *http.Request) {
 		Name:     name,
 		Jabatan:  jabatan,
 		Lokasi:   lokasi,
-		Profile:  utils.ImageUrlProvider(dst.Name(), r),
+		Profile:  utils.ImageUrlProvider(f.Name(), r),
 	}
 
 	err = config.DB.Save(&user).Error
@@ -101,6 +102,17 @@ func Login(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	err = config.DB.First(&dbUser).Error
+	if err != nil {
+		rw.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"message": "user not found",
+			"status":  http.StatusNotFound,
+		})
+		return
+	}
+
 	err = config.DB.Where("nik = ?", user.Nik).First(&dbUser).Error
 	if err != nil {
 		rw.WriteHeader(http.StatusNotFound)
@@ -132,5 +144,51 @@ func Login(rw http.ResponseWriter, r *http.Request) {
 			Lokasi:  dbUser.Lokasi,
 			Profile: dbUser.Profile,
 		},
+	})
+}
+
+func GetUserDetailById(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	idUser := r.URL.Query()["idUser"]
+
+	intIdUser, _ := strconv.Atoi(idUser[0])
+	user := models.User{}
+
+	err := config.DB.Where("id_user = ? ", intIdUser).First(&user).Error
+	if err != nil {
+		rw.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"message": "user not found",
+			"status":  http.StatusNotFound,
+		})
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"message": "success",
+		"data":    user,
+	})
+}
+
+func GetUserDetailByNik(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	nik := r.URL.Query()["nik"]
+
+	user := models.User{}
+	err := config.DB.Where("nik = ? ", nik).First(&user).Error
+	if err != nil {
+		rw.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(rw).Encode(map[string]interface{}{
+			"message": "user not found",
+			"status":  http.StatusNotFound,
+		})
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"message": "success",
+		"data":    user,
 	})
 }

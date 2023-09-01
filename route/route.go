@@ -16,7 +16,12 @@ func InitRoute() {
 
 	mux.HandleFunc("/register", controller.Register).Methods("POST")
 	mux.HandleFunc("/login", controller.Login).Methods("POST")
+	mux.HandleFunc("/user", controller.GetUserDetailById).Methods("GET")
+	mux.HandleFunc("/user/nik", controller.GetUserDetailByNik).Methods("GET")
+
 	mux.HandleFunc("/receipt", controller.CreateReceipt).Methods("POST")
+	mux.HandleFunc("/receipt", controller.UpdateStatusReceipt).Methods("PATCH")
+	mux.HandleFunc("/receipt/my-task", controller.GetListReceiptMyTask).Methods("GET")
 
 	http.ListenAndServe(":8080", middleware.Logger(os.Stderr, mux))
 }
