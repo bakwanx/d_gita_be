@@ -178,7 +178,7 @@ func GetListReceiptMyTask(rw http.ResponseWriter, r *http.Request) {
 
 	receipts := []models.Receipt{}
 
-	config.DB.Model(models.Receipt{}).Where(" id_user_receiver = ?", idUser).Find(&receipts)
+	config.DB.Model(models.Receipt{}).Where("id_user_receiver = ? AND status = 0", idUser).Find(&receipts)
 
 	receiptResponse := []models.ReceiptResponse{}
 	for _, v := range receipts {
@@ -210,3 +210,88 @@ func GetListReceiptMyTask(rw http.ResponseWriter, r *http.Request) {
 		"data":    receiptResponse,
 	})
 }
+
+func GetListReceiptWaiting(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+
+	idUser := r.URL.Query()["idUser"]
+
+	// receipts := []map[string]interface{}{}
+
+	receipts := []models.Receipt{}
+
+	config.DB.Model(models.Receipt{}).Where("id_user_sender = ? AND status = 0", idUser).Find(&receipts)
+
+	receiptResponse := []models.ReceiptResponse{}
+	for _, v := range receipts {
+		// get user for sender
+		var userSender = models.User{}
+		config.DB.Where("id_user = ?", v.IdUserSender).First(&userSender)
+
+		// get user for receiver
+		var userReceiver = models.User{}
+		config.DB.Where("id_user = ?", v.IdUserReceiver).First(&userReceiver)
+
+		receiptResponse = append(receiptResponse, models.ReceiptResponse{
+			IdReceipt:           v.IdReceipt,
+			DocumentName:        v.DocumentName,
+			DocumentType:        v.DocumentType,
+			DocumentProperty:    v.DocumentProperty,
+			DocumentInformation: v.DocumentInformation,
+			UserSender:          userSender,
+			UserReceiver:        userReceiver,
+			Date:                v.Date,
+			Status:              v.Status,
+		})
+	}
+
+	rw.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"message": "success",
+		"data":    receiptResponse,
+	})
+}
+
+func GetHistory(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+
+	idUser := r.URL.Query()["idUser"]
+
+	// receipts := []map[string]interface{}{}
+
+	receipts := []models.Receipt{}
+
+	config.DB.Model(models.Receipt{}).Where("id_user_sender = ? OR id_user_receiver = ? AND status = 1", idUser, idUser).Find(&receipts)
+
+	receiptResponse := []models.ReceiptResponse{}
+	for _, v := range receipts {
+		// get user for sender
+		var userSender = models.User{}
+		config.DB.Where("id_user = ?", v.IdUserSender).First(&userSender)
+
+		// get user for receiver
+		var userReceiver = models.User{}
+		config.DB.Where("id_user = ?", v.IdUserReceiver).First(&userReceiver)
+
+		receiptResponse = append(receiptResponse, models.ReceiptResponse{
+			IdReceipt:           v.IdReceipt,
+			DocumentName:        v.DocumentName,
+			DocumentType:        v.DocumentType,
+			DocumentProperty:    v.DocumentProperty,
+			DocumentInformation: v.DocumentInformation,
+			UserSender:          userSender,
+			UserReceiver:        userReceiver,
+			Date:                v.Date,
+			Status:              v.Status,
+		})
+	}
+
+	rw.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"message": "success",
+		"data":    receiptResponse,
+	})
+}
+

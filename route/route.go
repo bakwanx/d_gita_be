@@ -22,6 +22,11 @@ func InitRoute() {
 	mux.HandleFunc("/receipt", controller.CreateReceipt).Methods("POST")
 	mux.HandleFunc("/receipt", controller.UpdateStatusReceipt).Methods("PATCH")
 	mux.HandleFunc("/receipt/my-task", controller.GetListReceiptMyTask).Methods("GET")
+	mux.HandleFunc("/receipt/waiting", controller.GetListReceiptWaiting).Methods("GET")
+	mux.HandleFunc("/receipt/history", controller.GetHistory).Methods("GET")
+
+	mux.HandleFunc("/stuff", controller.PostStuff).Methods("POST")
+
 
 	http.ListenAndServe(":8080", middleware.Logger(os.Stderr, mux))
 }
