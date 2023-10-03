@@ -1,5 +1,12 @@
 package models
 
+type ImageReceipt struct {
+	ImageId   int    `gorm:"primarykey" json:"image_id" form:"image_id"`
+	IdReceipt int    `json:"id_receipt" form:"id_receipt"`
+	Image     string `json:"image" form:"image"`
+}
+
+
 type Receipt struct {
 	IdReceipt           int    `gorm:"primarykey" json:"id_receipt" form:"id_receipt"`
 	DocumentName        string `json:"document_name" form:"document_name"`

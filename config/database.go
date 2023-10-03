@@ -25,4 +25,5 @@ func initMigrate() {
 	DB.AutoMigrate(&models.ImageReceipt{})
 	DB.AutoMigrate(&models.Stuff{})
 	DB.AutoMigrate(&models.RequestStuff{})
+	DB.AutoMigrate(&models.ImageStuff{})
 }
