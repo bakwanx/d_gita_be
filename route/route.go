@@ -27,6 +27,6 @@ func InitRoute() {
 
 	mux.HandleFunc("/stuff", controller.PostStuff).Methods("POST")
 	mux.HandleFunc("/request-stuff", controller.PostRequestStuff).Methods("POST")
-
+	mux.HandleFunc("/request-stuff", controller.GetListRequestStuff).Methods("GET")
 	http.ListenAndServe(":8080", middleware.Logger(os.Stderr, mux))
 }

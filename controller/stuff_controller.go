@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-	"d_gita_be/utils"
 )
 
 func PostStuff(rw http.ResponseWriter, r *http.Request) {
@@ -32,9 +31,9 @@ func PostStuff(rw http.ResponseWriter, r *http.Request) {
 	typeStuff := r.FormValue("type_stuff")
 	intStock, err := strconv.Atoi(stock)
 	stuff := models.Stuff{
-		StuffName:	        stuffName,
-		Stock:		        intStock,
-		Type: 				typeStuff,
+		StuffName: stuffName,
+		Stock:     intStock,
+		Type:      typeStuff,
 	}
 
 	err = config.DB.Save(&stuff).Error
@@ -98,8 +97,8 @@ func PostStuff(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		imageStuff := models.ImageStuff{
-			IdStuff:   stuff.IdStuff,
-			Image:     f.Name(),
+			IdStuff: stuff.IdStuff,
+			Image:   f.Name(),
 		}
 
 		err = config.DB.Save(&imageStuff).Error
@@ -121,19 +120,22 @@ func PostStuff(rw http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 func PostRequestStuff(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
- 
+
 	idStuff, err := strconv.Atoi(r.FormValue("id_stuff"))
 	requestInformation := r.FormValue("request_information")
 	idUserRequest, err := strconv.Atoi(r.FormValue("id_user_request"))
 	typeRequest := r.FormValue("type_request")
 	total := r.FormValue("total")
-	startTime, err := utils.DateTimeFormatter(r.FormValue("start_time"))
-	endTime, err := utils.DateTimeFormatter(r.FormValue("end_time"))
-	date, err := utils.DateTimeFormatter(r.FormValue("date"))
+	// format time 2006-01-02 15:04:05
+	// startTime, err := utils.DateTimeFormatter(r.FormValue("start_time"))
+	// endTime, err := utils.DateTimeFormatter(r.FormValue("end_time"))
+	// date, err := utils.DateTimeFormatter(r.FormValue("date"))
 
+	startTime := r.FormValue("start_time")
+	endTime := r.FormValue("end_time")
+	date := r.FormValue("date")
 
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -145,17 +147,16 @@ func PostRequestStuff(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	requestStuff := models.RequestStuff{
-		IdStuff: idStuff,
+		IdStuff:            idStuff,
 		RequestInformation: requestInformation,
-		IdUserRequest  : idUserRequest,
-		StartTime     : startTime,
-		EndTime       : endTime,
-		TypeRequest   : typeRequest,
-		Total         : total,
-		Status        : "1",
-		Date          : date,
+		IdUserRequest:      idUserRequest,
+		StartTime:          startTime,
+		EndTime:            endTime,
+		TypeRequest:        typeRequest,
+		Total:              total,
+		Status:             "0",
+		Date:               date,
 	}
-
 
 	err = config.DB.Save(&requestStuff).Error
 	if err != nil {
@@ -166,10 +167,28 @@ func PostRequestStuff(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
-	// rw.WriteHeader(http.StatusOK)
-	// json.NewEncoder(rw).Encode(map[string]interface{}{
-	// 	"message": "success",
-	// 	"data":    requestStuff,
-	// })
+
+	rw.WriteHeader(http.StatusOK)
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"message": "success",
+		"data":    requestStuff,
+	})
+}
+
+func GetListRequestStuff(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+
+	idUser := r.URL.Query()["idUser"]
+
+	// receipts := []map[string]interface{}{}
+
+	requestStuff := []models.RequestStuff{}
+
+	config.DB.Model(models.RequestStuff{}).Where("id_user_request = ? AND status != 2", idUser).Find(&requestStuff)
+
+	rw.WriteHeader(http.StatusOK)
+	json.NewEncoder(rw).Encode(map[string]interface{}{
+		"message": "success",
+		"data":    requestStuff,
+	})
 }
